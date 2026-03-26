@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ИСПРАВЛЕННЫЙ СКРИПТ ТЕЛЕГРАМ -->
+    <script src="https://telegram.org"></script>
+    <style>
+        body { 
+            background: #1a1a1a; color: white; text-align: center; 
+            font-family: 'Segoe UI', sans-serif; user-select: none;
+            overflow: hidden; margin: 0; padding: 0;
+        }
+        .container { display: flex; flex-direction: column; justify-content: center; height: 100vh; }
+        h1 { font-size: 50px; margin: 0; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
+        
+        .coin-container { 
+            position: relative; margin: 40px auto; width: 220px; height: 220px; 
+        }
+        .coin { 
+            width: 200px; height: 200px; background: linear-gradient(45deg, #ffd700, #ff8c00);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 80px; cursor: pointer; border: 8px solid #b8860b;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: transform 0.05s;
+            position: relative; z-index: 2;
+        }
+        .coin:active { transform: scale(0.92); }
+
+        /* СТИЛЬ ДЛЯ ВСПЛЫВАЮЩИХ ЦИФР */
+        .plus-one {
+            position: absolute; color: #ffd700; font-size: 32px; font-weight: bold;
+            pointer-events: none; animation: floatUp 0.6s ease-out forwards;
+            z-index: 10;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-120px); opacity: 0; }
+        }
+        
+        p { color: #888; font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p>Ваш заработок:</p>
+        <h1 id="balance">0 $</h1>
+        
+        <div class="coin-container" id="coin-box">
+            <div class="coin" onclick="clickCoin(event)">💰</div>
+        </div>
+        
+        <p>Нажимай, чтобы заработать!</p>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        let balance = 0;
+        tg.expand();
+
+        function clickCoin(event) {
+            balance += 100;
+            const balanceElement = document.getElementById('balance');
+            balanceElement.innerText = balance.toLocaleString() + " $";
+
+            // СОЗДАНИЕ ЭФФЕКТА +100
+            const coinBox = document.getElementById('coin-box');
+            const plus = document.createElement('div');
+            plus.innerText = "+100";
+            plus.className = 'plus-one';
+            
+            // Координаты появления (рандомно чуть левее/правее центра)
+            const x = event.offsetX || (Math.random() * 100 + 50);
+            plus.style.left = x + 'px';
+            plus.style.top = '20px';
+
+            coinBox.appendChild(plus);
+
+            // Удаляем элемент после анимации
+            setTimeout(() => { plus.remove(); }, 600);
+
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        }
+
+        tg.MainButton.setText("СОХРАНИТЬ И ЗАБРАТЬ");
+        tg.MainButton.show();
+        tg.MainButton.onClick(() => {
+            tg.sendData(balance.toString());
+        });
+    </script>
+</body>
+</html>
