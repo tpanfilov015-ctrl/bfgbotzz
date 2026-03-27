@@ -2,56 +2,101 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Rich Clicker</title>
-    <!-- Правильный скрипт -->
+    <!-- ПРАВИЛЬНЫЙ СКРИПТ TELEGRAM -->
     <script src="https://telegram.org"></script>
     <style>
-        body { background: #111; color: white; text-align: center; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; }
-        #balance { font-size: 40px; color: gold; margin-bottom: 20px; }
-        #click-btn { width: 200px; height: 200px; background: orange; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 80px; cursor: pointer; border: 5px solid #333; }
+        body { 
+            background: #111; color: #fff; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; height: 100vh; margin: 0; 
+            font-family: 'Arial', sans-serif; overflow: hidden; touch-action: none; user-select: none; 
+        }
+        #balance-container { 
+            font-size: 45px; font-weight: 900; color: #ffcc00; 
+            margin-bottom: 30px; text-shadow: 0 0 20px rgba(255, 204, 0, 0.4); 
+        }
+        #click-btn { 
+            width: 240px; height: 240px; 
+            background: linear-gradient(145deg, #ffa500, #ff8c00); 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            font-size: 100px; cursor: pointer; border: 8px solid #333; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.3); 
+            transition: transform 0.05s; z-index: 10; 
+        }
+        #click-btn:active { transform: scale(0.92); }
+        .popup { 
+            position: absolute; color: #4df14d; font-size: 32px; font-weight: bold; 
+            pointer-events: none; z-index: 99; animation: moveUp 0.8s forwards; 
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.5); 
+        }
+        @keyframes moveUp { 
+            0% { transform: translateY(0); opacity: 1; } 
+            100% { transform: translateY(-160px); opacity: 0; } 
+        }
         #debug { position: fixed; bottom: 10px; font-size: 12px; color: #555; }
     </style>
 </head>
 <body>
 
-    <div id="balance">$ <span id="score">0</span></div>
+    <div id="balance-container">$ <span id="balance">0</span></div>
     <div id="click-btn">💰</div>
-    <div id="debug">Проверка SDK...</div>
+    <div id="debug">Инициализация...</div>
 
     <script>
-        // Инициализация
         const tg = window.Telegram.WebApp;
-        const scoreEl = document.getElementById('score');
+        const balanceEl = document.getElementById('balance');
         const btnEl = document.getElementById('click-btn');
         const debug = document.getElementById('debug');
 
         let score = 0;
 
-        // Сообщаем Telegram, что приложение готово
-        tg.ready();
-        tg.expand();
+        if (tg) {
+            tg.expand(); // Развернуть на весь экран
+            tg.ready();
+            debug.innerText = "Telegram SDK: OK";
+        }
 
-        // Сразу настраиваем и показываем главную кнопку ТГ
-        tg.MainButton.text = "СОХРАНИТЬ В БАЗУ";
-        tg.MainButton.color = "#2ecc71"; // Зеленый цвет
-        tg.MainButton.show(); 
+        function clickHandler(e) {
+            // Предотвращаем лишние срабатывания
+            if (e.type === 'touchstart') e.preventDefault();
 
-        // Клик по мешку
-        btnEl.onclick = () => {
             score += 100000;
-            scoreEl.innerText = score.toLocaleString();
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            debug.innerText = "Кликов: " + score;
-        };
+            balanceEl.innerText = score.toLocaleString();
 
-        // Клик по кнопке Telegram (внизу экрана)
-        tg.onEvent('mainButtonClicked', () => {
-            debug.innerText = "Отправка данных...";
-            // Отправляем данные боту (работает ТОЛЬКО через ReplyKeyboard)
-            tg.sendData(score.toString()); 
-        });
+            // Координаты для анимации
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
+            const p = document.createElement('div');
+            p.className = 'popup';
+            p.innerText = '+$100,000';
+            p.style.left = (clientX - 60) + 'px';
+            p.style.top = (clientY - 20) + 'px';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 800);
+
+            // Вибрация и кнопка сохранения
+            if (tg) {
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                
+                // Настраиваем кнопку сохранения
+                tg.MainButton.text = "СОХРАНИТЬ";
+                tg.MainButton.show();
+            }
+        }
+
+        // Слушаем клики и тапы
+        btnEl.addEventListener('pointerdown', clickHandler);
+
+        // ОБРАБОТКА НАЖАТИЯ НА КНОПКУ "СОХРАНИТЬ В БАЗУ"
+        if (tg) {
+            tg.onEvent('mainButtonClicked', function() {
+                // Отправляем число боту
+                tg.sendData(score.toString()); 
+                tg.close(); // Закрываем кликер
+            });
+        }
     </script>
 </body>
 </html>
