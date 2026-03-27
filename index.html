@@ -4,97 +4,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Rich Clicker</title>
+    <!-- ПРАВИЛЬНЫЙ СКРИПТ TELEGRAM -->
     <script src="https://telegram.org"></script>
     <style>
-        body {
-            background: #111;
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            font-family: 'Arial', sans-serif;
-            overflow: hidden;
-            touch-action: none;
-            user-select: none;
+        body { 
+            background: #111; color: #fff; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; height: 100vh; margin: 0; 
+            font-family: 'Arial', sans-serif; overflow: hidden; touch-action: none; user-select: none; 
         }
-
-        /* Стиль баланса со знаком $ */
-        #balance-container {
-            font-size: 45px;
-            font-weight: 900;
-            color: #ffcc00;
-            margin-bottom: 30px;
-            text-shadow: 0 0 20px rgba(255, 204, 0, 0.4);
+        #balance-container { 
+            font-size: 45px; font-weight: 900; color: #ffcc00; 
+            margin-bottom: 30px; text-shadow: 0 0 20px rgba(255, 204, 0, 0.4); 
         }
-
-        /* Стиль кнопки с мешком денег */
-        #click-btn {
-            width: 240px;
-            height: 240px;
-            background: linear-gradient(145deg, #ffa500, #ff8c00);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 100px; /* Размер мешка */
-            cursor: pointer;
-            border: 8px solid #333;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.3);
-            transition: transform 0.05s;
-            z-index: 10;
+        #click-btn { 
+            width: 240px; height: 240px; 
+            background: linear-gradient(145deg, #ffa500, #ff8c00); 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            font-size: 100px; cursor: pointer; border: 8px solid #333; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.3); 
+            transition: transform 0.05s; z-index: 10; 
         }
-
-        #click-btn:active {
-            transform: scale(0.92);
+        #click-btn:active { transform: scale(0.92); }
+        .popup { 
+            position: absolute; color: #4df14d; font-size: 32px; font-weight: bold; 
+            pointer-events: none; z-index: 99; animation: moveUp 0.8s forwards; 
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.5); 
         }
-
-        /* Анимация +100к */
-        .popup {
-            position: absolute;
-            color: #4df14d;
-            font-size: 32px;
-            font-weight: bold;
-            pointer-events: none;
-            z-index: 99;
-            animation: moveUp 0.8s forwards;
-            text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        @keyframes moveUp { 
+            0% { transform: translateY(0); opacity: 1; } 
+            100% { transform: translateY(-160px); opacity: 0; } 
         }
-
-        @keyframes moveUp {
-            0% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-160px); opacity: 0; }
-        }
+        #debug { position: fixed; bottom: 10px; font-size: 12px; color: #555; }
     </style>
 </head>
 <body>
 
-    <!-- Знак $ перед цифрами -->
     <div id="balance-container">$ <span id="balance">0</span></div>
-    
-    <!-- Мешок денег внутри кнопки -->
     <div id="click-btn">💰</div>
+    <div id="debug">Инициализация...</div>
 
     <script>
-        const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+        const tg = window.Telegram.WebApp;
+        const balanceEl = document.getElementById('balance');
+        const btnEl = document.getElementById('click-btn');
+        const debug = document.getElementById('debug');
+
         let score = 0;
 
         if (tg) {
-            tg.expand();
+            tg.expand(); // Развернуть на весь экран
             tg.ready();
+            debug.innerText = "Telegram SDK: OK";
         }
 
-        const balanceEl = document.getElementById('balance');
-        const btnEl = document.getElementById('click-btn');
-
         function clickHandler(e) {
-            if (e.cancelable) e.preventDefault();
+            // Предотвращаем лишние срабатывания
+            if (e.type === 'touchstart') e.preventDefault();
 
             score += 100000;
             balanceEl.innerText = score.toLocaleString();
 
+            // Координаты для анимации
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
@@ -106,19 +76,25 @@
             document.body.appendChild(p);
             setTimeout(() => p.remove(), 800);
 
+            // Вибрация и кнопка сохранения
             if (tg) {
                 if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-                tg.MainButton.setText("СОХРАНИТЬ В БАЗУ");
-                if (!tg.MainButton.isVisible) tg.MainButton.show();
+                
+                // Настраиваем кнопку сохранения
+                tg.MainButton.text = "СОХРАНИТЬ!";
+                tg.MainButton.show();
             }
         }
 
-        btnEl.addEventListener('mousedown', clickHandler);
-        btnEl.addEventListener('touchstart', clickHandler, { passive: false });
+        // Слушаем клики и тапы
+        btnEl.addEventListener('pointerdown', clickHandler);
 
+        // ОБРАБОТКА НАЖАТИЯ НА КНОПКУ "СОХРАНИТЬ В БАЗУ"
         if (tg) {
-            tg.onEvent('mainButtonClicked', () => {
-                tg.sendData(JSON.stringify({ total: score }));
+            tg.onEvent('mainButtonClicked', function() {
+                // Отправляем число боту
+                tg.sendData(score.toString()); 
+                tg.close(); // Закрываем кликер
             });
         }
     </script>
