@@ -4,97 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Clicker 100k</title>
+    <!-- Подключаем скрипт Telegram в самом начале -->
     <script src="https://telegram.org"></script>
     <style>
-        body {
-            background: #1a1a1a;
-            color: white;
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-            touch-action: none;
-            user-select: none;
-        }
-        #balance { font-size: 40px; margin-bottom: 20px; color: #f3ba2f; font-weight: bold; }
-        #click-btn {
-            width: 200px; height: 200px; border-radius: 50%;
-            background: gold; border: 8px solid #444;
-            font-size: 80px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: transform 0.05s;
-        }
-        #click-btn:active { transform: scale(0.9); }
-        .popup {
-            position: absolute; color: #4df14d; font-size: 30px; font-weight: bold;
-            pointer-events: none; z-index: 9999; animation: moveUp 0.8s forwards;
-        }
-        @keyframes moveUp {
-            0% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-150px); opacity: 0; }
-        }
+        body { background: #111; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; overflow: hidden; touch-action: none; user-select: none; }
+        #balance { font-size: 40px; color: gold; margin-bottom: 20px; font-weight: bold; }
+        #btn { width: 220px; height: 220px; background: orange; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 80px; cursor: pointer; border: 8px solid #333; transition: transform 0.05s; z-index: 10; shadow: 0 0 20px rgba(255,165,0,0.5); }
+        #btn:active { transform: scale(0.92); }
+        .popup { position: absolute; color: #4df14d; font-size: 30px; font-weight: bold; animation: up 0.8s forwards; pointer-events: none; z-index: 99; }
+        @keyframes up { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-150px); opacity: 0; } }
+        #debug { position: fixed; bottom: 10px; font-size: 10px; color: #555; }
     </style>
 </head>
 <body>
-
     <div id="balance">0</div>
-    <div id="click-btn">🪙</div>
+    <div id="btn">🪙</div>
+    <div id="debug">Инициализация...</div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        const btn = document.getElementById('click-btn');
-        const balanceDisplay = document.getElementById('balance');
-        let score = 0;
-
-        // Настройка TG
-        if (tg) {
+        const debug = document.getElementById('debug');
+        
+        // 1. Проверяем наличие Telegram SDK
+        let tg = null;
+        if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
             tg.expand();
             tg.ready();
+            debug.innerText = "Telegram SDK: OK";
+        } else {
+            debug.innerText = "Telegram SDK: Not found (Web Mode)";
         }
 
-        function handleEvent(e) {
-            if (e.type === 'touchstart') e.preventDefault();
+        let score = 0;
+        const balanceEl = document.getElementById('balance');
+        const btnEl = document.getElementById('btn');
 
+        function clickHandler(e) {
+            if (e.cancelable) e.preventDefault();
+
+            // Считаем
             score += 100000;
-            balanceDisplay.innerText = score.toLocaleString();
+            balanceEl.innerText = score.toLocaleString();
 
-            // Координаты (исправлено для браузера и ТГ)
-            let x, y;
-            if (e.touches && e.touches.length > 0) {
-                x = e.touches[0].clientX;
-                y = e.touches[0].clientY;
-            } else {
-                x = e.clientX;
-                y = e.clientY;
-            }
+            // Координаты (поддержка Touch и Mouse)
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            showPopup(x, y);
+            // Анимация
+            const p = document.createElement('div');
+            p.className = 'popup';
+            p.innerText = '+100,000';
+            p.style.left = (clientX - 50) + 'px';
+            p.style.top = (clientY - 20) + 'px';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 800);
 
-            // Функции Telegram
-            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            if (tg && tg.MainButton) {
-                tg.MainButton.setText("СОХРАНИТЬ");
+            // ТГ Фишки
+            if (tg) {
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                tg.MainButton.setText("СОХРАНИТЬ РЕЗУЛЬТАТ");
                 if (!tg.MainButton.isVisible) tg.MainButton.show();
             }
         }
 
-        function showPopup(x, y) {
-            const p = document.createElement('div');
-            p.className = 'popup';
-            p.innerText = '+100,000';
-            p.style.left = (x - 50) + 'px';
-            p.style.top = (y - 20) + 'px';
-            document.body.appendChild(p);
-            setTimeout(() => p.remove(), 800);
-        }
+        // Слушаем события
+        btnEl.addEventListener('mousedown', clickHandler);
+        btnEl.addEventListener('touchstart', clickHandler, { passive: false });
 
-        // Слушаем всё
-        btn.addEventListener('touchstart', handleEvent, { passive: false });
-        btn.addEventListener('mousedown', handleEvent);
-
+        // Кнопка сохранения
         if (tg) {
             tg.onEvent('mainButtonClicked', () => {
                 tg.sendData(JSON.stringify({ total: score }));
