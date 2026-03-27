@@ -2,76 +2,120 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Clicker 100k</title>
-    <!-- Подключаем скрипт Telegram в самом начале -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rich Clicker</title>
     <script src="https://telegram.org"></script>
     <style>
-        body { background: #111; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; overflow: hidden; touch-action: none; user-select: none; }
-        #balance { font-size: 40px; color: gold; margin-bottom: 20px; font-weight: bold; }
-        #btn { width: 220px; height: 220px; background: orange; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 80px; cursor: pointer; border: 8px solid #333; transition: transform 0.05s; z-index: 10; shadow: 0 0 20px rgba(255,165,0,0.5); }
-        #btn:active { transform: scale(0.92); }
-        .popup { position: absolute; color: #4df14d; font-size: 30px; font-weight: bold; animation: up 0.8s forwards; pointer-events: none; z-index: 99; }
-        @keyframes up { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-150px); opacity: 0; } }
-        #debug { position: fixed; bottom: 10px; font-size: 10px; color: #555; }
+        body {
+            background: #111;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        /* Стиль баланса со знаком $ */
+        #balance-container {
+            font-size: 45px;
+            font-weight: 900;
+            color: #ffcc00;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(255, 204, 0, 0.4);
+        }
+
+        /* Стиль кнопки с мешком денег */
+        #click-btn {
+            width: 240px;
+            height: 240px;
+            background: linear-gradient(145deg, #ffa500, #ff8c00);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 100px; /* Размер мешка */
+            cursor: pointer;
+            border: 8px solid #333;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.3);
+            transition: transform 0.05s;
+            z-index: 10;
+        }
+
+        #click-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* Анимация +100к */
+        .popup {
+            position: absolute;
+            color: #4df14d;
+            font-size: 32px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 99;
+            animation: moveUp 0.8s forwards;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+
+        @keyframes moveUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-160px); opacity: 0; }
+        }
     </style>
 </head>
 <body>
-    <div id="balance">0</div>
-    <div id="btn">🪙</div>
-    <div id="debug">Инициализация...</div>
+
+    <!-- Знак $ перед цифрами -->
+    <div id="balance-container">$ <span id="balance">0</span></div>
+    
+    <!-- Мешок денег внутри кнопки -->
+    <div id="click-btn">💰</div>
 
     <script>
-        const debug = document.getElementById('debug');
-        
-        // 1. Проверяем наличие Telegram SDK
-        let tg = null;
-        if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
+        const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+        let score = 0;
+
+        if (tg) {
             tg.expand();
             tg.ready();
-            debug.innerText = "Telegram SDK: OK";
-        } else {
-            debug.innerText = "Telegram SDK: Not found (Web Mode)";
         }
 
-        let score = 0;
         const balanceEl = document.getElementById('balance');
-        const btnEl = document.getElementById('btn');
+        const btnEl = document.getElementById('click-btn');
 
         function clickHandler(e) {
             if (e.cancelable) e.preventDefault();
 
-            // Считаем
             score += 100000;
             balanceEl.innerText = score.toLocaleString();
 
-            // Координаты (поддержка Touch и Mouse)
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            // Анимация
             const p = document.createElement('div');
             p.className = 'popup';
-            p.innerText = '+100,000';
-            p.style.left = (clientX - 50) + 'px';
+            p.innerText = '+$100,000';
+            p.style.left = (clientX - 60) + 'px';
             p.style.top = (clientY - 20) + 'px';
             document.body.appendChild(p);
             setTimeout(() => p.remove(), 800);
 
-            // ТГ Фишки
             if (tg) {
                 if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-                tg.MainButton.setText("СОХРАНИТЬ РЕЗУЛЬТАТ");
+                tg.MainButton.setText("СОХРАНИТЬ В БАЗУ");
                 if (!tg.MainButton.isVisible) tg.MainButton.show();
             }
         }
 
-        // Слушаем события
         btnEl.addEventListener('mousedown', clickHandler);
         btnEl.addEventListener('touchstart', clickHandler, { passive: false });
 
-        // Кнопка сохранения
         if (tg) {
             tg.onEvent('mainButtonClicked', () => {
                 tg.sendData(JSON.stringify({ total: score }));
