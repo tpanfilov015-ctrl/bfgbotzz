@@ -199,11 +199,30 @@
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             createPopup(clientX, clientY);
 
-            if (tg) {
-                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-                tg.MainButton.text = "СОХРАНИТЬ";
-                tg.MainButton.show();
-            }
+           if (tg) {
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+    
+    // Показываем кнопку сохранения, если она еще не видна
+    if (!tg.MainButton.isVisible) {
+        tg.MainButton.text = "СОХРАНИТЬ РЕЗУЛЬТАТ";
+        tg.MainButton.show();
+    }
+}
+
+if (tg) {
+    tg.onEvent('mainButtonClicked', function() {
+        // Отправляем текущий накликаный результат боту
+        tg.sendData(score.toString()); 
+
+        // ОБНУЛЯЕМ локальный счет, чтобы не накручивать в базе
+        score = 0;
+        localStorage.setItem('clicker_score', "0");
+        balanceEl.innerText = "0";
+
+        // Закрываем приложение
+        tg.close();
+    });
+}
 
             if (energy <= 0) startCooldown(180);
         }
