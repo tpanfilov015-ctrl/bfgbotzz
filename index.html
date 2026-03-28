@@ -25,13 +25,17 @@
             font-size: 45px;
             font-weight: 900;
             color: #ffcc00;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             text-shadow: 0 0 20px rgba(255, 204, 0, 0.4);
         }
         #energy-container {
-            font-size: 20px;
-            color: #aaa;
-            margin-bottom: 30px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #ffaa00;
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 5px 15px;
+            border-radius: 20px;
         }
         #click-btn {
             width: 240px;
@@ -59,19 +63,20 @@
             transform: scale(0.92);
         }
         #click-btn.disabled {
-            opacity: 0.5;
+            opacity: 0.4;
+            filter: grayscale(0.8);
             cursor: not-allowed;
-            filter: grayscale(1);
         }
         #cooldown-timer {
             position: absolute;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: #fff;
-            background: rgba(0,0,0,0.6);
-            padding: 5px 10px;
-            border-radius: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 15px;
             display: none;
+            z-index: 20;
         }
         .popup {
             position: absolute;
@@ -91,7 +96,7 @@
 </head>
 <body>
     <div id="balance-container">$ <span id="balance">0</span></div>
-    <div id="energy-container">Энергия: <span id="energy">500</span> / 500</div>
+    <div id="energy-container">⚡ <span id="energy">500</span> / 500</div>
     
     <div id="click-btn">
         💰
@@ -105,66 +110,94 @@
         const btnEl = document.getElementById('click-btn');
         const timerEl = document.getElementById('cooldown-timer');
         
-        let score = 0;
-        let energy = 500;
-        const maxEnergy = 500;
+        // --- ЗАГРУЗКА ДАННЫХ ---
+        let score = parseInt(localStorage.getItem('clicker_score')) || 0;
+        let energy = localStorage.getItem('clicker_energy') !== null ? parseInt(localStorage.getItem('clicker_energy')) : 500;
+        let cooldownEnd = localStorage.getItem('cooldown_end'); 
+        
         let isCooldown = false;
+        const maxEnergy = 500;
+
+        // Инициализация экрана
+        balanceEl.innerText = score.toLocaleString();
+        energyEl.innerText = energy;
 
         if (tg) {
             tg.expand();
             tg.ready();
         }
 
-        function startCooldown() {
+        // --- ЛОГИКА ТАЙМЕРА ---
+        function checkCooldown() {
+            if (cooldownEnd) {
+                const now = Date.now();
+                const remaining = Math.ceil((parseInt(cooldownEnd) - now) / 1000);
+
+                if (remaining > 0) {
+                    startCooldown(remaining);
+                } else {
+                    resetEnergy();
+                }
+            } else if (energy <= 0) {
+                startCooldown(180);
+            }
+        }
+
+        function startCooldown(seconds) {
             isCooldown = true;
             btnEl.classList.add('disabled');
             timerEl.style.display = 'block';
             
-            let timeLeft = 180; // 3 минуты
+            if (!cooldownEnd) {
+                cooldownEnd = Date.now() + (seconds * 1000);
+                localStorage.setItem('cooldown_end', cooldownEnd);
+            }
 
             const interval = setInterval(() => {
-                timeLeft--;
-                let mins = Math.floor(timeLeft / 60);
-                let secs = timeLeft % 60;
-                timerEl.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                const now = Date.now();
+                const timeLeft = Math.ceil((parseInt(cooldownEnd) - now) / 1000);
 
                 if (timeLeft <= 0) {
                     clearInterval(interval);
-                    energy = maxEnergy;
-                    isCooldown = false;
-                    btnEl.classList.remove('disabled');
-                    timerEl.style.display = 'none';
-                    energyEl.innerText = energy;
+                    resetEnergy();
+                } else {
+                    let mins = Math.floor(timeLeft / 60);
+                    let secs = timeLeft % 60;
+                    timerEl.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
                 }
             }, 1000);
         }
 
+        function resetEnergy() {
+            energy = maxEnergy;
+            isCooldown = false;
+            cooldownEnd = null;
+            localStorage.removeItem('cooldown_end');
+            localStorage.setItem('clicker_energy', energy);
+            
+            btnEl.classList.remove('disabled');
+            timerEl.style.display = 'none';
+            energyEl.innerText = energy;
+        }
+
+        // --- КЛИК ---
         function clickHandler(e) {
-            if (isCooldown) return;
+            if (isCooldown || energy <= 0) return;
 
-            if (energy <= 0) {
-                startCooldown();
-                return;
-            }
-
-            // Логика клика
             score += 100000;
             energy -= 1;
             
             balanceEl.innerText = score.toLocaleString();
             energyEl.innerText = energy;
 
-            // Анимация +100к
+            // Сохраняем прогресс
+            localStorage.setItem('clicker_score', score);
+            localStorage.setItem('clicker_energy', energy);
+
+            // Попап анимация
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            const p = document.createElement('div');
-            p.className = 'popup';
-            p.innerText = '+$100,000';
-            p.style.left = (clientX - 60) + 'px';
-            p.style.top = (clientY - 20) + 'px';
-            document.body.appendChild(p);
-            setTimeout(() => p.remove(), 800);
+            createPopup(clientX, clientY);
 
             if (tg) {
                 if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
@@ -172,7 +205,17 @@
                 tg.MainButton.show();
             }
 
-            if (energy <= 0) startCooldown();
+            if (energy <= 0) startCooldown(180);
+        }
+
+        function createPopup(x, y) {
+            const p = document.createElement('div');
+            p.className = 'popup';
+            p.innerText = '+$100,000';
+            p.style.left = (x - 60) + 'px';
+            p.style.top = (y - 20) + 'px';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 800);
         }
 
         btnEl.addEventListener('pointerdown', clickHandler);
@@ -183,6 +226,9 @@
                 tg.close();
             });
         }
+
+        // Запуск проверки при старте
+        checkCooldown();
     </script>
 </body>
 </html>
