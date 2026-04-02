@@ -116,7 +116,9 @@
         let cooldownEnd = localStorage.getItem('cooldown_end'); 
         
         let isCooldown = false;
+        let cooldownInterval = null;
         const maxEnergy = 500;
+        const clickReward = 100000;
 
         // Инициализация экрана
         balanceEl.innerText = score.toLocaleString();
@@ -153,12 +155,15 @@
                 localStorage.setItem('cooldown_end', cooldownEnd);
             }
 
-            const interval = setInterval(() => {
+            if (cooldownInterval) clearInterval(cooldownInterval);
+            
+            cooldownInterval = setInterval(() => {
                 const now = Date.now();
                 const timeLeft = Math.ceil((parseInt(cooldownEnd) - now) / 1000);
 
                 if (timeLeft <= 0) {
-                    clearInterval(interval);
+                    clearInterval(cooldownInterval);
+                    cooldownInterval = null;
                     resetEnergy();
                 } else {
                     let mins = Math.floor(timeLeft / 60);
@@ -178,13 +183,35 @@
             btnEl.classList.remove('disabled');
             timerEl.style.display = 'none';
             energyEl.innerText = energy;
+            
+            if (cooldownInterval) {
+                clearInterval(cooldownInterval);
+                cooldownInterval = null;
+            }
+        }
+
+        // --- ОТПРАВКА ДАННЫХ В БОТ ---
+        function sendDataToBot() {
+            if (score > 0) {
+                console.log("Отправляем данные боту:", score);
+                tg.sendData(score.toString());
+                
+                // Обнуляем счет после отправки
+                score = 0;
+                localStorage.setItem('clicker_score', "0");
+                balanceEl.innerText = "0";
+            } else {
+                console.log("Нет данных для отправки");
+                tg.sendData("0");
+            }
+            tg.close();
         }
 
         // --- КЛИК ---
         function clickHandler(e) {
             if (isCooldown || energy <= 0) return;
 
-            score += 100000;
+            score += clickReward;
             energy -= 1;
             
             balanceEl.innerText = score.toLocaleString();
@@ -199,30 +226,16 @@
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             createPopup(clientX, clientY);
 
-           if (tg) {
-    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-    
-    // Показываем кнопку сохранения, если она еще не видна
-    if (!tg.MainButton.isVisible) {
-        tg.MainButton.text = "СОХРАНИТЬ РЕЗУЛЬТАТ";
-        tg.MainButton.show();
-    }
-}
-
-if (tg) {
-    tg.onEvent('mainButtonClicked', function() {
-        // Отправляем текущий накликаный результат боту
-        tg.sendData(score.toString()); 
-
-        // ОБНУЛЯЕМ локальный счет, чтобы не накручивать в базе
-        score = 0;
-        localStorage.setItem('clicker_score', "0");
-        balanceEl.innerText = "0";
-
-        // Закрываем приложение
-        tg.close();
-    });
-}
+            // Вибрация
+            if (tg && tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+            
+            // Показываем кнопку сохранения, если она еще не видна
+            if (tg && !tg.MainButton.isVisible) {
+                tg.MainButton.text = "СОХРАНИТЬ РЕЗУЛЬТАТ";
+                tg.MainButton.show();
+            }
 
             if (energy <= 0) startCooldown(180);
         }
@@ -230,24 +243,30 @@ if (tg) {
         function createPopup(x, y) {
             const p = document.createElement('div');
             p.className = 'popup';
-            p.innerText = '+$100,000';
+            p.innerText = `+$${clickReward.toLocaleString()}`;
             p.style.left = (x - 60) + 'px';
             p.style.top = (y - 20) + 'px';
             document.body.appendChild(p);
             setTimeout(() => p.remove(), 800);
         }
 
+        // --- НАВЕШИВАЕМ ОБРАБОТЧИКИ ---
         btnEl.addEventListener('pointerdown', clickHandler);
 
+        // Настройка кнопки сохранения в Telegram
         if (tg) {
-            tg.onEvent('mainButtonClicked', function() {
-                tg.sendData(score.toString());
-                tg.close();
-            });
+            tg.MainButton.text = "СОХРАНИТЬ РЕЗУЛЬТАТ";
+            tg.MainButton.onClick(sendDataToBot);
         }
 
         // Запуск проверки при старте
         checkCooldown();
+        
+        // Сохраняем энергию при закрытии страницы
+        window.addEventListener('beforeunload', function() {
+            localStorage.setItem('clicker_energy', energy);
+            localStorage.setItem('clicker_score', score);
+        });
     </script>
 </body>
 </html>
