@@ -92,16 +92,24 @@
             0% { transform: translateY(0); opacity: 1; }
             100% { transform: translateY(-160px); opacity: 0; }
         }
+        #info-text {
+            position: absolute;
+            bottom: 20px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <div id="balance-container">$ <span id="balance">0</span></div>
+    <div id="balance-container">💰 $<span id="balance">0</span></div>
     <div id="energy-container">⚡ <span id="energy">500</span> / 500</div>
     
     <div id="click-btn">
         💰
         <div id="cooldown-timer">03:00</div>
     </div>
+    <div id="info-text">💰 За 500 энергии вы получите 1,000,000,000$</div>
 
     <script>
         const tg = window.Telegram.WebApp;
@@ -118,8 +126,11 @@
         let isCooldown = false;
         let cooldownInterval = null;
         const maxEnergy = 500;
-        const clickReward = 100000;
-
+        
+        // Новая формула: за 500 энергии = 1,000,000,000 (1 миллиард)
+        // Значит за 1 клик = 1,000,000,000 / 500 = 2,000,000 за клик
+        const clickReward = 2000000; // 2 миллиона за клик
+        
         // Инициализация экрана
         balanceEl.innerText = score.toLocaleString();
         energyEl.innerText = energy;
@@ -127,6 +138,7 @@
         if (tg) {
             tg.expand();
             tg.ready();
+            tg.MainButton.hide();
         }
 
         // --- ЛОГИКА ТАЙМЕРА ---
@@ -204,6 +216,9 @@
                 console.log("Нет данных для отправки");
                 tg.sendData("0");
             }
+            
+            // Скрываем кнопку после отправки
+            tg.MainButton.hide();
             tg.close();
         }
 
@@ -222,8 +237,14 @@
             localStorage.setItem('clicker_energy', energy);
 
             // Попап анимация
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
             createPopup(clientX, clientY);
 
             // Вибрация
@@ -231,9 +252,11 @@
                 tg.HapticFeedback.impactOccurred('medium');
             }
             
-            // Показываем кнопку сохранения, если она еще не видна
-            if (tg && !tg.MainButton.isVisible) {
-                tg.MainButton.text = "СОХРАНИТЬ РЕЗУЛЬТАТ";
+            // Показываем инлайн кнопку сохранения
+            if (tg && !tg.MainButton.isVisible && score > 0) {
+                tg.MainButton.text = "💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ";
+                tg.MainButton.color = "#28a745";
+                tg.MainButton.textColor = "#ffffff";
                 tg.MainButton.show();
             }
 
@@ -251,16 +274,27 @@
         }
 
         // --- НАВЕШИВАЕМ ОБРАБОТЧИКИ ---
-        btnEl.addEventListener('pointerdown', clickHandler);
+        btnEl.addEventListener('click', clickHandler);
+        btnEl.addEventListener('touchstart', clickHandler, { passive: false });
 
         // Настройка кнопки сохранения в Telegram
         if (tg) {
-            tg.MainButton.text = "СОХРАНИТЬ РЕЗУЛЬТАТ";
+            tg.MainButton.text = "💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ";
+            tg.MainButton.color = "#28a745";
+            tg.MainButton.textColor = "#ffffff";
             tg.MainButton.onClick(sendDataToBot);
         }
 
         // Запуск проверки при старте
         checkCooldown();
+        
+        // Показываем кнопку если есть несохраненный прогресс
+        if (score > 0 && tg && !tg.MainButton.isVisible) {
+            tg.MainButton.text = "💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ";
+            tg.MainButton.color = "#28a745";
+            tg.MainButton.textColor = "#ffffff";
+            tg.MainButton.show();
+        }
         
         // Сохраняем энергию при закрытии страницы
         window.addEventListener('beforeunload', function() {
