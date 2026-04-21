@@ -52,12 +52,12 @@
             transition: transform 0.05s, opacity 0.3s;
             z-index: 10;
             position: relative;
-            -webkit-tap-highlight-color: transparent; 
-            -webkit-touch-callout: none;             
-            -webkit-user-select: none;                
-            user-select: none;                       
-            touch-action: manipulation;               
-            outline: none;                            
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            outline: none;
         }
         #click-btn:active {
             transform: scale(0.92);
@@ -99,6 +99,26 @@
             color: #666;
             text-align: center;
         }
+        #save-btn {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 40px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        #save-btn:active {
+            transform: translateX(-50%) scale(0.95);
+        }
     </style>
 </head>
 <body>
@@ -110,6 +130,7 @@
         <div id="cooldown-timer">03:00</div>
     </div>
     <div id="info-text">💰 За 500 энергии вы получите 1,000,000,000$</div>
+    <button id="save-btn">💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ</button>
 
     <script>
         const tg = window.Telegram.WebApp;
@@ -117,8 +138,8 @@
         const energyEl = document.getElementById('energy');
         const btnEl = document.getElementById('click-btn');
         const timerEl = document.getElementById('cooldown-timer');
+        const saveBtn = document.getElementById('save-btn');
         
-        // --- ЗАГРУЗКА ДАННЫХ ---
         let score = parseInt(localStorage.getItem('clicker_score')) || 0;
         let energy = localStorage.getItem('clicker_energy') !== null ? parseInt(localStorage.getItem('clicker_energy')) : 500;
         let cooldownEnd = localStorage.getItem('cooldown_end'); 
@@ -126,27 +147,28 @@
         let isCooldown = false;
         let cooldownInterval = null;
         const maxEnergy = 500;
+        const clickReward = 2000000;
         
-        // Новая формула: за 500 энергии = 1,000,000,000 (1 миллиард)
-        // Значит за 1 клик = 1,000,000,000 / 500 = 2,000,000 за клик
-        const clickReward = 2000000; // 2 миллиона за клик
-        
-        // Инициализация экрана
         balanceEl.innerText = score.toLocaleString();
         energyEl.innerText = energy;
 
         if (tg) {
             tg.expand();
             tg.ready();
-            tg.MainButton.hide();
         }
 
-        // --- ЛОГИКА ТАЙМЕРА ---
+        function showSaveButton() {
+            if (score > 0) {
+                saveBtn.style.display = 'block';
+            } else {
+                saveBtn.style.display = 'none';
+            }
+        }
+
         function checkCooldown() {
             if (cooldownEnd) {
                 const now = Date.now();
                 const remaining = Math.ceil((parseInt(cooldownEnd) - now) / 1000);
-
                 if (remaining > 0) {
                     startCooldown(remaining);
                 } else {
@@ -172,7 +194,6 @@
             cooldownInterval = setInterval(() => {
                 const now = Date.now();
                 const timeLeft = Math.ceil((parseInt(cooldownEnd) - now) / 1000);
-
                 if (timeLeft <= 0) {
                     clearInterval(cooldownInterval);
                     cooldownInterval = null;
@@ -191,38 +212,30 @@
             cooldownEnd = null;
             localStorage.removeItem('cooldown_end');
             localStorage.setItem('clicker_energy', energy);
-            
             btnEl.classList.remove('disabled');
             timerEl.style.display = 'none';
             energyEl.innerText = energy;
-            
             if (cooldownInterval) {
                 clearInterval(cooldownInterval);
                 cooldownInterval = null;
             }
         }
 
-        // --- ОТПРАВКА ДАННЫХ В БОТ ---
         function sendDataToBot() {
             if (score > 0) {
-                console.log("Отправляем данные боту:", score);
-                tg.sendData(score.toString());
-                
-                // Обнуляем счет после отправки
+                if (tg) {
+                    tg.sendData(score.toString());
+                }
                 score = 0;
                 localStorage.setItem('clicker_score', "0");
                 balanceEl.innerText = "0";
-            } else {
-                console.log("Нет данных для отправки");
-                tg.sendData("0");
+                saveBtn.style.display = 'none';
             }
-            
-            // Скрываем кнопку после отправки
-            tg.MainButton.hide();
-            tg.close();
+            if (tg) {
+                tg.close();
+            }
         }
 
-        // --- КЛИК ---
         function clickHandler(e) {
             if (isCooldown || energy <= 0) return;
 
@@ -232,11 +245,9 @@
             balanceEl.innerText = score.toLocaleString();
             energyEl.innerText = energy;
 
-            // Сохраняем прогресс
             localStorage.setItem('clicker_score', score);
             localStorage.setItem('clicker_energy', energy);
 
-            // Попап анимация
             let clientX, clientY;
             if (e.touches) {
                 clientX = e.touches[0].clientX;
@@ -247,18 +258,11 @@
             }
             createPopup(clientX, clientY);
 
-            // Вибрация
             if (tg && tg.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('medium');
             }
             
-            // Показываем инлайн кнопку сохранения
-            if (tg && !tg.MainButton.isVisible && score > 0) {
-                tg.MainButton.text = "💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ";
-                tg.MainButton.color = "#28a745";
-                tg.MainButton.textColor = "#ffffff";
-                tg.MainButton.show();
-            }
+            showSaveButton();
 
             if (energy <= 0) startCooldown(180);
         }
@@ -273,30 +277,13 @@
             setTimeout(() => p.remove(), 800);
         }
 
-        // --- НАВЕШИВАЕМ ОБРАБОТЧИКИ ---
         btnEl.addEventListener('click', clickHandler);
         btnEl.addEventListener('touchstart', clickHandler, { passive: false });
+        saveBtn.addEventListener('click', sendDataToBot);
 
-        // Настройка кнопки сохранения в Telegram
-        if (tg) {
-            tg.MainButton.text = "💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ";
-            tg.MainButton.color = "#28a745";
-            tg.MainButton.textColor = "#ffffff";
-            tg.MainButton.onClick(sendDataToBot);
-        }
-
-        // Запуск проверки при старте
         checkCooldown();
+        showSaveButton();
         
-        // Показываем кнопку если есть несохраненный прогресс
-        if (score > 0 && tg && !tg.MainButton.isVisible) {
-            tg.MainButton.text = "💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ";
-            tg.MainButton.color = "#28a745";
-            tg.MainButton.textColor = "#ffffff";
-            tg.MainButton.show();
-        }
-        
-        // Сохраняем энергию при закрытии страницы
         window.addEventListener('beforeunload', function() {
             localStorage.setItem('clicker_energy', energy);
             localStorage.setItem('clicker_score', score);
