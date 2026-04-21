@@ -50,6 +50,7 @@
             transition: transform 0.05s;
             user-select: none;
             touch-action: manipulation;
+            position: relative;
         }
         #click-btn:active {
             transform: scale(0.92);
@@ -68,6 +69,10 @@
             padding: 10px 20px;
             border-radius: 15px;
             display: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
         }
         .popup {
             position: absolute;
@@ -111,6 +116,27 @@
         #save-btn:active {
             transform: translateX(-50%) scale(0.97);
         }
+        .toast {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #28a745;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 200;
+            animation: fadeOut 2s forwards;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: translateX(-50%) scale(1); }
+            70% { opacity: 1; transform: translateX(-50%) scale(1); }
+            100% { opacity: 0; transform: translateX(-50%) scale(0.9); visibility: hidden; }
+        }
     </style>
 </head>
 <body>
@@ -135,6 +161,17 @@
         
         const clickReward = 2000000;
         const maxEnergy = 500;
+        
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            if (isError) {
+                toast.style.background = '#dc3545';
+            }
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
         
         function updateUI() {
             document.getElementById('balance').innerText = score.toLocaleString();
@@ -194,9 +231,13 @@
             }, 1000);
         }
         
-        function clickHandler() {
-            if (isCooldown) return;
+        function clickHandler(e) {
+            if (isCooldown) {
+                showToast('⏳ Подождите, энергия восстанавливается', true);
+                return;
+            }
             if (energy <= 0) {
+                showToast('⚡ Нет энергии! Подождите 3 минуты', true);
                 startCooldown(180);
                 return;
             }
@@ -206,39 +247,87 @@
             updateUI();
             save();
             
-            if (energy <= 0) startCooldown(180);
+            const btn = document.getElementById('click-btn');
+            const rect = btn.getBoundingClientRect();
+            let x, y;
+            if (e.touches) {
+                x = e.touches[0].clientX;
+                y = e.touches[0].clientY;
+            } else {
+                x = e.clientX;
+                y = e.clientY;
+            }
+            
+            const popup = document.createElement('div');
+            popup.className = 'popup';
+            popup.innerText = `+$${clickReward.toLocaleString()}`;
+            popup.style.left = (x - 60) + 'px';
+            popup.style.top = (y - 20) + 'px';
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 800);
+            
+            if (tg && tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+            
+            if (energy <= 0) {
+                startCooldown(180);
+                showToast('⚡ Энергия закончилась! Отдых 3 минуты', true);
+            }
         }
         
         function sendToBot() {
             if (score > 0 && tg) {
-                tg.sendData(score.toString());
-                score = 0;
-                save();
-                updateUI();
-                tg.close();
+                try {
+                    tg.sendData(score.toString());
+                    showToast(`✅ Отправлено ${score.toLocaleString()}$`);
+                    
+                    setTimeout(() => {
+                        try {
+                            tg.close();
+                        } catch(e) {
+                            window.close();
+                        }
+                    }, 500);
+                    
+                    score = 0;
+                    save();
+                    updateUI();
+                } catch(e) {
+                    showToast('❌ Ошибка отправки', true);
+                }
+            } else if (score === 0) {
+                showToast('❌ Нет денег для сохранения', true);
+            } else if (!tg) {
+                showToast('❌ Не в Telegram', true);
             }
         }
         
-        document.getElementById('click-btn').onclick = clickHandler;
-        document.getElementById('click-btn').ontouchstart = clickHandler;
-        document.getElementById('save-btn').onclick = sendToBot;
+        document.getElementById('click-btn').addEventListener('click', clickHandler);
+        document.getElementById('click-btn').addEventListener('touchstart', clickHandler, { passive: false });
+        document.getElementById('save-btn').addEventListener('click', sendToBot);
         
         if (tg) {
             tg.expand();
             tg.ready();
             tg.MainButton.hide();
+            
+            tg.onEvent('mainButtonClicked', function() {
+                sendToBot();
+            });
         }
         
         load();
+        
         if (cooldownEnd && Date.now() < parseInt(cooldownEnd)) {
             startCooldown(Math.ceil((parseInt(cooldownEnd) - Date.now()) / 1000));
         } else if (energy <= 0) {
             startCooldown(180);
         }
         
-        window.onbeforeunload = function() {
+        window.addEventListener('beforeunload', function() {
             save();
-        };
+        });
     </script>
 </body>
 </html>
