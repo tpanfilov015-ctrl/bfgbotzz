@@ -3,331 +3,239 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Rich Clicker</title>
+    <title>Clicker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
         body {
             background: #111;
-            color: #fff;
+            color: white;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
+            height: 100vh;
             margin: 0;
-            font-family: 'Arial', sans-serif;
-            padding: 20px;
-            box-sizing: border-box;
+            font-family: Arial, sans-serif;
         }
-        #balance-container {
-            font-size: 45px;
-            font-weight: 900;
-            color: #ffcc00;
-            margin-bottom: 5px;
-            text-shadow: 0 0 20px rgba(255, 204, 0, 0.4);
-        }
-        #energy-container {
-            font-size: 22px;
+        .balance {
+            font-size: 48px;
             font-weight: bold;
-            color: #ffaa00;
-            margin-bottom: 25px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 5px 15px;
-            border-radius: 20px;
+            color: gold;
+            margin-bottom: 10px;
         }
-        #click-btn {
-            width: 240px;
-            height: 240px;
-            background: linear-gradient(145deg, #ffa500, #ff8c00);
+        .energy {
+            font-size: 24px;
+            color: orange;
+            margin-bottom: 30px;
+        }
+        .coin {
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle at 30% 30%, #ffcc00, #ff9900);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 100px;
+            font-size: 80px;
             cursor: pointer;
-            border: 8px solid #333;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.3);
-            transition: transform 0.05s;
-            user-select: none;
-            touch-action: manipulation;
-            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: 0.05s linear;
+            border: 5px solid #ffaa00;
         }
-        #click-btn:active {
-            transform: scale(0.92);
+        .coin:active {
+            transform: scale(0.95);
         }
-        #click-btn.disabled {
-            opacity: 0.4;
-            filter: grayscale(0.8);
-            cursor: not-allowed;
-        }
-        #cooldown-timer {
-            position: absolute;
-            font-size: 28px;
-            font-weight: bold;
-            color: #fff;
-            background: rgba(0,0,0,0.7);
-            padding: 10px 20px;
-            border-radius: 15px;
-            display: none;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            white-space: nowrap;
-        }
-        .popup {
-            position: absolute;
-            color: #4df14d;
-            font-size: 32px;
-            font-weight: bold;
+        .coin.disabled {
+            opacity: 0.5;
             pointer-events: none;
-            animation: moveUp 0.8s forwards;
         }
-        @keyframes moveUp {
-            0% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-160px); opacity: 0; }
+        .timer {
+            margin-top: 30px;
+            font-size: 20px;
+            color: red;
+            display: none;
         }
-        #info-text {
+        .save-btn {
             position: fixed;
-            bottom: 20px;
-            font-size: 12px;
-            color: #666;
-            text-align: center;
-            left: 0;
-            right: 0;
-        }
-        #save-btn {
-            position: fixed;
-            bottom: 80px;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            width: 80%;
-            max-width: 300px;
-            padding: 15px 20px;
             background: #28a745;
             color: white;
             border: none;
+            padding: 15px 40px;
             border-radius: 50px;
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            z-index: 100;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        #save-btn:active {
-            transform: translateX(-50%) scale(0.97);
+            display: none;
+            width: 80%;
+            max-width: 300px;
         }
         .toast {
             position: fixed;
-            bottom: 180px;
+            bottom: 120px;
             left: 50%;
             transform: translateX(-50%);
             background: #28a745;
             color: white;
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-size: 16px;
-            font-weight: bold;
-            z-index: 200;
-            animation: fadeOut 2s forwards;
-            white-space: nowrap;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            animation: fade 2s forwards;
         }
-        @keyframes fadeOut {
-            0% { opacity: 1; transform: translateX(-50%) scale(1); }
-            70% { opacity: 1; transform: translateX(-50%) scale(1); }
-            100% { opacity: 0; transform: translateX(-50%) scale(0.9); visibility: hidden; }
+        @keyframes fade {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; display: none; }
         }
     </style>
 </head>
 <body>
-    <div id="balance-container">💰 $<span id="balance">0</span></div>
-    <div id="energy-container">⚡ <span id="energy">500</span> / 500</div>
-    
-    <div id="click-btn">
-        💰
-        <div id="cooldown-timer">03:00</div>
-    </div>
-    <div id="info-text">💰 За 500 энергии вы получите 1,000,000,000$</div>
-    <button id="save-btn">💾 СОХРАНИТЬ И ЗАЧИСЛИТЬ</button>
+    <div class="balance">💰 $<span id="balance">0</span></div>
+    <div class="energy">⚡ <span id="energy">500</span> / 500</div>
+    <div class="coin" id="coin">💰</div>
+    <div class="timer" id="timer">03:00</div>
+    <button class="save-btn" id="saveBtn">💾 СОХРАНИТЬ</button>
 
     <script>
         const tg = window.Telegram.WebApp;
         
-        let score = 0;
+        let money = 0;
         let energy = 500;
-        let cooldownEnd = null;
-        let isCooldown = false;
-        let cooldownInterval = null;
+        let cooldownUntil = null;
+        let timerInterval = null;
         
-        const clickReward = 2000000;
-        const maxEnergy = 500;
+        const MAX_ENERGY = 500;
+        const PER_CLICK = 2000000;
         
-        function showToast(message, isError = false) {
-            const toast = document.createElement('div');
+        const balanceEl = document.getElementById('balance');
+        const energyEl = document.getElementById('energy');
+        const coinEl = document.getElementById('coin');
+        const timerEl = document.getElementById('timer');
+        const saveBtn = document.getElementById('saveBtn');
+        
+        function saveToLocal() {
+            localStorage.setItem('clicker_money', money);
+            localStorage.setItem('clicker_energy', energy);
+            if (cooldownUntil) localStorage.setItem('clicker_cooldown', cooldownUntil);
+        }
+        
+        function loadFromLocal() {
+            let m = localStorage.getItem('clicker_money');
+            let e = localStorage.getItem('clicker_energy');
+            let c = localStorage.getItem('clicker_cooldown');
+            if (m) money = parseInt(m);
+            if (e) energy = parseInt(e);
+            if (c && parseInt(c) > Date.now()) cooldownUntil = parseInt(c);
+            balanceEl.innerText = money.toLocaleString();
+            energyEl.innerText = energy;
+        }
+        
+        function showToast(msg, isError = false) {
+            let toast = document.createElement('div');
             toast.className = 'toast';
-            toast.textContent = message;
-            if (isError) {
-                toast.style.background = '#dc3545';
-            }
+            toast.textContent = msg;
+            if (isError) toast.style.background = '#dc3545';
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
         }
         
-        function updateUI() {
-            document.getElementById('balance').innerText = score.toLocaleString();
-            document.getElementById('energy').innerText = energy;
-        }
-        
-        function save() {
-            localStorage.setItem('score', score);
-            localStorage.setItem('energy', energy);
-            if (cooldownEnd) localStorage.setItem('cooldownEnd', cooldownEnd);
-        }
-        
-        function load() {
-            let s = localStorage.getItem('score');
-            let e = localStorage.getItem('energy');
-            let c = localStorage.getItem('cooldownEnd');
-            if (s) score = parseInt(s);
-            if (e) energy = parseInt(e);
-            if (c) cooldownEnd = c;
-            updateUI();
-        }
-        
-        function resetEnergy() {
-            energy = maxEnergy;
-            isCooldown = false;
-            cooldownEnd = null;
-            localStorage.removeItem('cooldownEnd');
-            save();
-            updateUI();
-            document.getElementById('click-btn').classList.remove('disabled');
-            document.getElementById('cooldown-timer').style.display = 'none';
-            if (cooldownInterval) clearInterval(cooldownInterval);
-        }
-        
         function startCooldown(seconds) {
-            isCooldown = true;
-            document.getElementById('click-btn').classList.add('disabled');
-            document.getElementById('cooldown-timer').style.display = 'block';
+            if (timerInterval) clearInterval(timerInterval);
+            cooldownUntil = Date.now() + (seconds * 1000);
+            saveToLocal();
+            coinEl.classList.add('disabled');
+            timerEl.style.display = 'block';
             
-            if (!cooldownEnd) {
-                cooldownEnd = Date.now() + (seconds * 1000);
-                save();
-            }
-            
-            if (cooldownInterval) clearInterval(cooldownInterval);
-            
-            cooldownInterval = setInterval(() => {
-                let remaining = Math.ceil((parseInt(cooldownEnd) - Date.now()) / 1000);
-                if (remaining <= 0) {
-                    clearInterval(cooldownInterval);
-                    resetEnergy();
+            timerInterval = setInterval(() => {
+                let left = Math.ceil((cooldownUntil - Date.now()) / 1000);
+                if (left <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    energy = MAX_ENERGY;
+                    cooldownUntil = null;
+                    coinEl.classList.remove('disabled');
+                    timerEl.style.display = 'none';
+                    energyEl.innerText = energy;
+                    saveToLocal();
+                    showToast('⚡ Энергия восстановлена!');
                 } else {
-                    let mins = Math.floor(remaining / 60);
-                    let secs = remaining % 60;
-                    document.getElementById('cooldown-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                    let mins = Math.floor(left / 60);
+                    let secs = left % 60;
+                    timerEl.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
                 }
             }, 1000);
         }
         
-        function clickHandler(e) {
-            if (isCooldown) {
-                showToast('⏳ Подождите, энергия восстанавливается', true);
+        function clickHandler() {
+            if (cooldownUntil && cooldownUntil > Date.now()) {
+                showToast('⏳ Нет энергии!', true);
                 return;
             }
             if (energy <= 0) {
-                showToast('⚡ Нет энергии! Подождите 3 минуты', true);
                 startCooldown(180);
                 return;
             }
             
-            score += clickReward;
+            money += PER_CLICK;
             energy--;
-            updateUI();
-            save();
             
-            const btn = document.getElementById('click-btn');
-            const rect = btn.getBoundingClientRect();
-            let x, y;
-            if (e.touches) {
-                x = e.touches[0].clientX;
-                y = e.touches[0].clientY;
-            } else {
-                x = e.clientX;
-                y = e.clientY;
-            }
-            
-            const popup = document.createElement('div');
-            popup.className = 'popup';
-            popup.innerText = `+$${clickReward.toLocaleString()}`;
-            popup.style.left = (x - 60) + 'px';
-            popup.style.top = (y - 20) + 'px';
-            document.body.appendChild(popup);
-            setTimeout(() => popup.remove(), 800);
-            
-            if (tg && tg.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('medium');
-            }
+            balanceEl.innerText = money.toLocaleString();
+            energyEl.innerText = energy;
+            saveToLocal();
             
             if (energy <= 0) {
                 startCooldown(180);
-                showToast('⚡ Энергия закончилась! Отдых 3 минуты', true);
             }
+            
+            if (money > 0) {
+                saveBtn.style.display = 'block';
+            }
+            
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
         }
         
         function sendToBot() {
-            if (score > 0 && tg) {
-                try {
-                    tg.sendData(score.toString());
-                    showToast(`✅ Отправлено ${score.toLocaleString()}$`);
-                    
-                    setTimeout(() => {
-                        try {
-                            tg.close();
-                        } catch(e) {
-                            window.close();
-                        }
-                    }, 500);
-                    
-                    score = 0;
-                    save();
-                    updateUI();
-                } catch(e) {
-                    showToast('❌ Ошибка отправки', true);
-                }
-            } else if (score === 0) {
-                showToast('❌ Нет денег для сохранения', true);
-            } else if (!tg) {
-                showToast('❌ Не в Telegram', true);
+            if (money > 0 && tg) {
+                tg.sendData(money.toString());
+                showToast(`✅ Отправлено ${money.toLocaleString()}$`);
+                money = 0;
+                balanceEl.innerText = '0';
+                saveBtn.style.display = 'none';
+                saveToLocal();
+                setTimeout(() => tg.close(), 300);
+            } else {
+                showToast('❌ Нет денег', true);
             }
         }
         
-        document.getElementById('click-btn').addEventListener('click', clickHandler);
-        document.getElementById('click-btn').addEventListener('touchstart', clickHandler, { passive: false });
-        document.getElementById('save-btn').addEventListener('click', sendToBot);
+        coinEl.onclick = clickHandler;
+        coinEl.ontouchstart = clickHandler;
+        saveBtn.onclick = sendToBot;
         
         if (tg) {
             tg.expand();
             tg.ready();
             tg.MainButton.hide();
-            
-            tg.onEvent('mainButtonClicked', function() {
-                sendToBot();
-            });
         }
         
-        load();
+        loadFromLocal();
         
-        if (cooldownEnd && Date.now() < parseInt(cooldownEnd)) {
-            startCooldown(Math.ceil((parseInt(cooldownEnd) - Date.now()) / 1000));
+        if (cooldownUntil && cooldownUntil > Date.now()) {
+            let left = Math.ceil((cooldownUntil - Date.now()) / 1000);
+            startCooldown(left);
         } else if (energy <= 0) {
             startCooldown(180);
         }
         
-        window.addEventListener('beforeunload', function() {
-            save();
-        });
+        if (money > 0) saveBtn.style.display = 'block';
+        
+        window.onbeforeunload = () => saveToLocal();
     </script>
 </body>
 </html>
