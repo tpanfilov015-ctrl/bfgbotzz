@@ -35,11 +35,6 @@
             padding: 5px 15px;
             border-radius: 20px;
         }
-        #clicks-container {
-            font-size: 16px;
-            color: #888;
-            margin-bottom: 20px;
-        }
         #click-btn {
             width: 240px;
             height: 240px;
@@ -53,9 +48,7 @@
             border: 8px solid #333;
             box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.3);
             transition: transform 0.05s, opacity 0.3s;
-            z-index: 10;
             position: relative;
-            -webkit-tap-highlight-color: transparent;
             user-select: none;
             touch-action: manipulation;
         }
@@ -76,7 +69,6 @@
             padding: 10px 20px;
             border-radius: 15px;
             display: none;
-            z-index: 20;
         }
         .popup {
             position: absolute;
@@ -84,7 +76,6 @@
             font-size: 32px;
             font-weight: bold;
             pointer-events: none;
-            z-index: 99;
             animation: moveUp 0.8s forwards;
             text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
         }
@@ -147,7 +138,6 @@
 <body>
     <div id="balance-container">💰 $<span id="balance">0</span></div>
     <div id="energy-container">⚡ <span id="energy">500</span> / 500</div>
-    <div id="clicks-container">🖱️ Кликов: <span id="clicks">0</span></div>
     
     <div id="click-btn">
         💰
@@ -160,31 +150,38 @@
         const tg = window.Telegram.WebApp;
         const balanceEl = document.getElementById('balance');
         const energyEl = document.getElementById('energy');
-        const clicksEl = document.getElementById('clicks');
         const btnEl = document.getElementById('click-btn');
         const timerEl = document.getElementById('cooldown-timer');
         const saveBtn = document.getElementById('save-btn');
         
-        let score = parseInt(localStorage.getItem('clicker_score')) || 0;
-        let energy = parseInt(localStorage.getItem('clicker_energy')) || 500;
-        let clicks = parseInt(localStorage.getItem('clicker_clicks')) || 0;
-        let cooldownEnd = localStorage.getItem('cooldown_end'); 
+        let score = 0;
+        let energy = 500;
+        let cooldownEnd = null;
         
         let isCooldown = false;
         let cooldownInterval = null;
         const maxEnergy = 500;
         const clickReward = 2000000;
         
-        balanceEl.innerText = score.toLocaleString();
-        energyEl.innerText = energy;
-        clicksEl.innerText = clicks;
-
-        if (tg) {
-            tg.expand();
-            tg.ready();
-            tg.MainButton.hide();
+        function loadData() {
+            let savedScore = localStorage.getItem('clicker_score');
+            let savedEnergy = localStorage.getItem('clicker_energy');
+            let savedCooldown = localStorage.getItem('cooldown_end');
+            
+            if (savedScore) score = parseInt(savedScore);
+            if (savedEnergy) energy = parseInt(savedEnergy);
+            if (savedCooldown) cooldownEnd = savedCooldown;
+            
+            balanceEl.innerText = score.toLocaleString();
+            energyEl.innerText = energy;
         }
-
+        
+        function saveData() {
+            localStorage.setItem('clicker_score', score);
+            localStorage.setItem('clicker_energy', energy);
+            if (cooldownEnd) localStorage.setItem('cooldown_end', cooldownEnd);
+        }
+        
         function showToast(message) {
             const toast = document.createElement('div');
             toast.className = 'toast';
@@ -192,21 +189,11 @@
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
         }
-
+        
         function showSaveButton() {
-            if (score > 0) {
-                saveBtn.style.display = 'block';
-            } else {
-                saveBtn.style.display = 'none';
-            }
+            saveBtn.style.display = score > 0 ? 'block' : 'none';
         }
-
-        function saveToLocal() {
-            localStorage.setItem('clicker_score', score);
-            localStorage.setItem('clicker_energy', energy);
-            localStorage.setItem('clicker_clicks', clicks);
-        }
-
+        
         function checkCooldown() {
             if (cooldownEnd) {
                 const now = Date.now();
@@ -220,7 +207,7 @@
                 startCooldown(180);
             }
         }
-
+        
         function startCooldown(seconds) {
             isCooldown = true;
             btnEl.classList.add('disabled');
@@ -228,9 +215,9 @@
             
             if (!cooldownEnd) {
                 cooldownEnd = Date.now() + (seconds * 1000);
-                localStorage.setItem('cooldown_end', cooldownEnd);
+                saveData();
             }
-
+            
             if (cooldownInterval) clearInterval(cooldownInterval);
             
             cooldownInterval = setInterval(() => {
@@ -247,13 +234,13 @@
                 }
             }, 1000);
         }
-
+        
         function resetEnergy() {
             energy = maxEnergy;
             isCooldown = false;
             cooldownEnd = null;
             localStorage.removeItem('cooldown_end');
-            saveToLocal();
+            saveData();
             btnEl.classList.remove('disabled');
             timerEl.style.display = 'none';
             energyEl.innerText = energy;
@@ -263,22 +250,27 @@
             }
             showToast('⚡ Энергия восстановлена!');
         }
-
+        
         function sendDataToBot() {
             if (score > 0) {
+                showToast(`📤 Отправка ${score.toLocaleString()}$...`);
+                
                 if (tg) {
                     tg.sendData(score.toString());
-                    showToast(`📤 Отправлено ${score.toLocaleString()}$`);
+                    tg.close();
+                } else {
+                    showToast('❌ Ошибка: не в Telegram');
                 }
+                
                 score = 0;
-                saveToLocal();
+                saveData();
                 balanceEl.innerText = "0";
                 saveBtn.style.display = 'none';
             } else {
                 showToast('❌ Нет денег для сохранения');
             }
         }
-
+        
         function clickHandler(e) {
             if (isCooldown) {
                 showToast('⏳ Подождите, энергия восстанавливается');
@@ -288,58 +280,58 @@
                 showToast('⚡ Нет энергии! Подождите 3 минуты');
                 return;
             }
-
+            
             score += clickReward;
             energy -= 1;
-            clicks += 1;
             
             balanceEl.innerText = score.toLocaleString();
             energyEl.innerText = energy;
-            clicksEl.innerText = clicks;
-
-            saveToLocal();
-
-            let clientX, clientY;
-            if (e.touches) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-            createPopup(clientX, clientY);
-
+            
+            saveData();
+            
+            let x = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            let y = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+            
+            const popup = document.createElement('div');
+            popup.className = 'popup';
+            popup.innerText = `+$${clickReward.toLocaleString()}`;
+            popup.style.left = (x - 60) + 'px';
+            popup.style.top = (y - 20) + 'px';
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 800);
+            
             if (tg && tg.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('medium');
             }
             
             showSaveButton();
-
+            
             if (energy <= 0) {
                 startCooldown(180);
                 showToast('⚡ Энергия закончилась! Отдых 3 минуты');
             }
         }
-
-        function createPopup(x, y) {
-            const p = document.createElement('div');
-            p.className = 'popup';
-            p.innerText = `+$${clickReward.toLocaleString()}`;
-            p.style.left = (x - 60) + 'px';
-            p.style.top = (y - 20) + 'px';
-            document.body.appendChild(p);
-            setTimeout(() => p.remove(), 800);
+        
+        if (tg) {
+            tg.expand();
+            tg.ready();
+            tg.MainButton.hide();
+            
+            tg.onEvent('mainButtonClicked', function() {
+                sendDataToBot();
+            });
         }
-
-        btnEl.addEventListener('click', clickHandler);
-        btnEl.addEventListener('touchstart', clickHandler, { passive: false });
-        saveBtn.addEventListener('click', sendDataToBot);
-
+        
+        loadData();
         checkCooldown();
         showSaveButton();
         
+        btnEl.addEventListener('click', clickHandler);
+        btnEl.addEventListener('touchstart', clickHandler, { passive: false });
+        saveBtn.addEventListener('click', sendDataToBot);
+        
         window.addEventListener('beforeunload', function() {
-            saveToLocal();
+            saveData();
         });
     </script>
 </body>
