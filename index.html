@@ -47,8 +47,7 @@
             cursor: pointer;
             border: 8px solid #333;
             box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.3);
-            transition: transform 0.05s, opacity 0.3s;
-            position: relative;
+            transition: transform 0.05s;
             user-select: none;
             touch-action: manipulation;
         }
@@ -77,7 +76,6 @@
             font-weight: bold;
             pointer-events: none;
             animation: moveUp 0.8s forwards;
-            text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
         }
         @keyframes moveUp {
             0% { transform: translateY(0); opacity: 1; }
@@ -107,31 +105,11 @@
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            display: none;
             z-index: 100;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         #save-btn:active {
             transform: translateX(-50%) scale(0.97);
-        }
-        .toast {
-            position: fixed;
-            bottom: 160px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            color: #4df14d;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 14px;
-            z-index: 101;
-            animation: fadeOut 2s forwards;
-            white-space: nowrap;
-        }
-        @keyframes fadeOut {
-            0% { opacity: 1; }
-            70% { opacity: 1; }
-            100% { opacity: 0; visibility: hidden; }
         }
     </style>
 </head>
@@ -148,191 +126,119 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        const balanceEl = document.getElementById('balance');
-        const energyEl = document.getElementById('energy');
-        const btnEl = document.getElementById('click-btn');
-        const timerEl = document.getElementById('cooldown-timer');
-        const saveBtn = document.getElementById('save-btn');
         
         let score = 0;
         let energy = 500;
         let cooldownEnd = null;
-        
         let isCooldown = false;
         let cooldownInterval = null;
-        const maxEnergy = 500;
+        
         const clickReward = 2000000;
+        const maxEnergy = 500;
         
-        function loadData() {
-            let savedScore = localStorage.getItem('clicker_score');
-            let savedEnergy = localStorage.getItem('clicker_energy');
-            let savedCooldown = localStorage.getItem('cooldown_end');
-            
-            if (savedScore) score = parseInt(savedScore);
-            if (savedEnergy) energy = parseInt(savedEnergy);
-            if (savedCooldown) cooldownEnd = savedCooldown;
-            
-            balanceEl.innerText = score.toLocaleString();
-            energyEl.innerText = energy;
+        function updateUI() {
+            document.getElementById('balance').innerText = score.toLocaleString();
+            document.getElementById('energy').innerText = energy;
         }
         
-        function saveData() {
-            localStorage.setItem('clicker_score', score);
-            localStorage.setItem('clicker_energy', energy);
-            if (cooldownEnd) localStorage.setItem('cooldown_end', cooldownEnd);
+        function save() {
+            localStorage.setItem('score', score);
+            localStorage.setItem('energy', energy);
+            if (cooldownEnd) localStorage.setItem('cooldownEnd', cooldownEnd);
         }
         
-        function showToast(message) {
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2000);
-        }
-        
-        function showSaveButton() {
-            saveBtn.style.display = score > 0 ? 'block' : 'none';
-        }
-        
-        function checkCooldown() {
-            if (cooldownEnd) {
-                const now = Date.now();
-                const remaining = Math.ceil((parseInt(cooldownEnd) - now) / 1000);
-                if (remaining > 0) {
-                    startCooldown(remaining);
-                } else {
-                    resetEnergy();
-                }
-            } else if (energy <= 0) {
-                startCooldown(180);
-            }
-        }
-        
-        function startCooldown(seconds) {
-            isCooldown = true;
-            btnEl.classList.add('disabled');
-            timerEl.style.display = 'block';
-            
-            if (!cooldownEnd) {
-                cooldownEnd = Date.now() + (seconds * 1000);
-                saveData();
-            }
-            
-            if (cooldownInterval) clearInterval(cooldownInterval);
-            
-            cooldownInterval = setInterval(() => {
-                const now = Date.now();
-                const timeLeft = Math.ceil((parseInt(cooldownEnd) - now) / 1000);
-                if (timeLeft <= 0) {
-                    clearInterval(cooldownInterval);
-                    cooldownInterval = null;
-                    resetEnergy();
-                } else {
-                    let mins = Math.floor(timeLeft / 60);
-                    let secs = timeLeft % 60;
-                    timerEl.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-                }
-            }, 1000);
+        function load() {
+            let s = localStorage.getItem('score');
+            let e = localStorage.getItem('energy');
+            let c = localStorage.getItem('cooldownEnd');
+            if (s) score = parseInt(s);
+            if (e) energy = parseInt(e);
+            if (c) cooldownEnd = c;
+            updateUI();
         }
         
         function resetEnergy() {
             energy = maxEnergy;
             isCooldown = false;
             cooldownEnd = null;
-            localStorage.removeItem('cooldown_end');
-            saveData();
-            btnEl.classList.remove('disabled');
-            timerEl.style.display = 'none';
-            energyEl.innerText = energy;
-            if (cooldownInterval) {
-                clearInterval(cooldownInterval);
-                cooldownInterval = null;
-            }
-            showToast('⚡ Энергия восстановлена!');
+            localStorage.removeItem('cooldownEnd');
+            save();
+            updateUI();
+            document.getElementById('click-btn').classList.remove('disabled');
+            document.getElementById('cooldown-timer').style.display = 'none';
+            if (cooldownInterval) clearInterval(cooldownInterval);
         }
         
-        function sendDataToBot() {
-            if (score > 0) {
-                showToast(`📤 Отправка ${score.toLocaleString()}$...`);
-                
-                if (tg) {
-                    tg.sendData(score.toString());
-                    tg.close();
+        function startCooldown(seconds) {
+            isCooldown = true;
+            document.getElementById('click-btn').classList.add('disabled');
+            document.getElementById('cooldown-timer').style.display = 'block';
+            
+            if (!cooldownEnd) {
+                cooldownEnd = Date.now() + (seconds * 1000);
+                save();
+            }
+            
+            if (cooldownInterval) clearInterval(cooldownInterval);
+            
+            cooldownInterval = setInterval(() => {
+                let remaining = Math.ceil((parseInt(cooldownEnd) - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    clearInterval(cooldownInterval);
+                    resetEnergy();
                 } else {
-                    showToast('❌ Ошибка: не в Telegram');
+                    let mins = Math.floor(remaining / 60);
+                    let secs = remaining % 60;
+                    document.getElementById('cooldown-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
                 }
-                
-                score = 0;
-                saveData();
-                balanceEl.innerText = "0";
-                saveBtn.style.display = 'none';
-            } else {
-                showToast('❌ Нет денег для сохранения');
-            }
+            }, 1000);
         }
         
-        function clickHandler(e) {
-            if (isCooldown) {
-                showToast('⏳ Подождите, энергия восстанавливается');
-                return;
-            }
+        function clickHandler() {
+            if (isCooldown) return;
             if (energy <= 0) {
-                showToast('⚡ Нет энергии! Подождите 3 минуты');
+                startCooldown(180);
                 return;
             }
             
             score += clickReward;
-            energy -= 1;
+            energy--;
+            updateUI();
+            save();
             
-            balanceEl.innerText = score.toLocaleString();
-            energyEl.innerText = energy;
-            
-            saveData();
-            
-            let x = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-            let y = e.clientY || (e.touches ? e.touches[0].clientY : 0);
-            
-            const popup = document.createElement('div');
-            popup.className = 'popup';
-            popup.innerText = `+$${clickReward.toLocaleString()}`;
-            popup.style.left = (x - 60) + 'px';
-            popup.style.top = (y - 20) + 'px';
-            document.body.appendChild(popup);
-            setTimeout(() => popup.remove(), 800);
-            
-            if (tg && tg.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('medium');
-            }
-            
-            showSaveButton();
-            
-            if (energy <= 0) {
-                startCooldown(180);
-                showToast('⚡ Энергия закончилась! Отдых 3 минуты');
+            if (energy <= 0) startCooldown(180);
+        }
+        
+        function sendToBot() {
+            if (score > 0 && tg) {
+                tg.sendData(score.toString());
+                score = 0;
+                save();
+                updateUI();
+                tg.close();
             }
         }
+        
+        document.getElementById('click-btn').onclick = clickHandler;
+        document.getElementById('click-btn').ontouchstart = clickHandler;
+        document.getElementById('save-btn').onclick = sendToBot;
         
         if (tg) {
             tg.expand();
             tg.ready();
             tg.MainButton.hide();
-            
-            tg.onEvent('mainButtonClicked', function() {
-                sendDataToBot();
-            });
         }
         
-        loadData();
-        checkCooldown();
-        showSaveButton();
+        load();
+        if (cooldownEnd && Date.now() < parseInt(cooldownEnd)) {
+            startCooldown(Math.ceil((parseInt(cooldownEnd) - Date.now()) / 1000));
+        } else if (energy <= 0) {
+            startCooldown(180);
+        }
         
-        btnEl.addEventListener('click', clickHandler);
-        btnEl.addEventListener('touchstart', clickHandler, { passive: false });
-        saveBtn.addEventListener('click', sendDataToBot);
-        
-        window.addEventListener('beforeunload', function() {
-            saveData();
-        });
+        window.onbeforeunload = function() {
+            save();
+        };
     </script>
 </body>
 </html>
