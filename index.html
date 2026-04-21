@@ -13,13 +13,11 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
             font-family: 'Arial', sans-serif;
-            overflow: hidden;
-            touch-action: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
+            padding: 20px;
+            box-sizing: border-box;
         }
         #balance-container {
             font-size: 45px;
@@ -37,6 +35,11 @@
             padding: 5px 15px;
             border-radius: 20px;
         }
+        #clicks-container {
+            font-size: 16px;
+            color: #888;
+            margin-bottom: 20px;
+        }
         #click-btn {
             width: 240px;
             height: 240px;
@@ -53,11 +56,8 @@
             z-index: 10;
             position: relative;
             -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
             user-select: none;
             touch-action: manipulation;
-            outline: none;
         }
         #click-btn:active {
             transform: scale(0.92);
@@ -93,23 +93,27 @@
             100% { transform: translateY(-160px); opacity: 0; }
         }
         #info-text {
-            position: absolute;
+            position: fixed;
             bottom: 20px;
             font-size: 12px;
             color: #666;
             text-align: center;
+            left: 0;
+            right: 0;
         }
         #save-btn {
             position: fixed;
             bottom: 80px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 15px 40px;
+            width: 80%;
+            max-width: 300px;
+            padding: 15px 20px;
             background: #28a745;
             color: white;
             border: none;
             border-radius: 50px;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             cursor: pointer;
             display: none;
@@ -117,13 +121,33 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         #save-btn:active {
-            transform: translateX(-50%) scale(0.95);
+            transform: translateX(-50%) scale(0.97);
+        }
+        .toast {
+            position: fixed;
+            bottom: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: #4df14d;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 101;
+            animation: fadeOut 2s forwards;
+            white-space: nowrap;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
         }
     </style>
 </head>
 <body>
     <div id="balance-container">💰 $<span id="balance">0</span></div>
     <div id="energy-container">⚡ <span id="energy">500</span> / 500</div>
+    <div id="clicks-container">🖱️ Кликов: <span id="clicks">0</span></div>
     
     <div id="click-btn">
         💰
@@ -136,12 +160,14 @@
         const tg = window.Telegram.WebApp;
         const balanceEl = document.getElementById('balance');
         const energyEl = document.getElementById('energy');
+        const clicksEl = document.getElementById('clicks');
         const btnEl = document.getElementById('click-btn');
         const timerEl = document.getElementById('cooldown-timer');
         const saveBtn = document.getElementById('save-btn');
         
         let score = parseInt(localStorage.getItem('clicker_score')) || 0;
-        let energy = localStorage.getItem('clicker_energy') !== null ? parseInt(localStorage.getItem('clicker_energy')) : 500;
+        let energy = parseInt(localStorage.getItem('clicker_energy')) || 500;
+        let clicks = parseInt(localStorage.getItem('clicker_clicks')) || 0;
         let cooldownEnd = localStorage.getItem('cooldown_end'); 
         
         let isCooldown = false;
@@ -151,10 +177,20 @@
         
         balanceEl.innerText = score.toLocaleString();
         energyEl.innerText = energy;
+        clicksEl.innerText = clicks;
 
         if (tg) {
             tg.expand();
             tg.ready();
+            tg.MainButton.hide();
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
         }
 
         function showSaveButton() {
@@ -163,6 +199,12 @@
             } else {
                 saveBtn.style.display = 'none';
             }
+        }
+
+        function saveToLocal() {
+            localStorage.setItem('clicker_score', score);
+            localStorage.setItem('clicker_energy', energy);
+            localStorage.setItem('clicker_clicks', clicks);
         }
 
         function checkCooldown() {
@@ -211,7 +253,7 @@
             isCooldown = false;
             cooldownEnd = null;
             localStorage.removeItem('cooldown_end');
-            localStorage.setItem('clicker_energy', energy);
+            saveToLocal();
             btnEl.classList.remove('disabled');
             timerEl.style.display = 'none';
             energyEl.innerText = energy;
@@ -219,34 +261,43 @@
                 clearInterval(cooldownInterval);
                 cooldownInterval = null;
             }
+            showToast('⚡ Энергия восстановлена!');
         }
 
         function sendDataToBot() {
             if (score > 0) {
                 if (tg) {
                     tg.sendData(score.toString());
+                    showToast(`📤 Отправлено ${score.toLocaleString()}$`);
                 }
                 score = 0;
-                localStorage.setItem('clicker_score', "0");
+                saveToLocal();
                 balanceEl.innerText = "0";
                 saveBtn.style.display = 'none';
-            }
-            if (tg) {
-                tg.close();
+            } else {
+                showToast('❌ Нет денег для сохранения');
             }
         }
 
         function clickHandler(e) {
-            if (isCooldown || energy <= 0) return;
+            if (isCooldown) {
+                showToast('⏳ Подождите, энергия восстанавливается');
+                return;
+            }
+            if (energy <= 0) {
+                showToast('⚡ Нет энергии! Подождите 3 минуты');
+                return;
+            }
 
             score += clickReward;
             energy -= 1;
+            clicks += 1;
             
             balanceEl.innerText = score.toLocaleString();
             energyEl.innerText = energy;
+            clicksEl.innerText = clicks;
 
-            localStorage.setItem('clicker_score', score);
-            localStorage.setItem('clicker_energy', energy);
+            saveToLocal();
 
             let clientX, clientY;
             if (e.touches) {
@@ -264,7 +315,10 @@
             
             showSaveButton();
 
-            if (energy <= 0) startCooldown(180);
+            if (energy <= 0) {
+                startCooldown(180);
+                showToast('⚡ Энергия закончилась! Отдых 3 минуты');
+            }
         }
 
         function createPopup(x, y) {
@@ -285,8 +339,7 @@
         showSaveButton();
         
         window.addEventListener('beforeunload', function() {
-            localStorage.setItem('clicker_energy', energy);
-            localStorage.setItem('clicker_score', score);
+            saveToLocal();
         });
     </script>
 </body>
